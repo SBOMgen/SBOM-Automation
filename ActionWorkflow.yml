@@ -32,39 +32,58 @@ jobs:
         # jq . ${{ github.workspace }}/sbom.json
         depscan --bom ${{ github.workspace }}/sbom.json -o ${{ github.workspace }}/vulRep.html
     - name: Upload SBOM
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: sbom-${{ github.run_id }}-${{ github.run_number }}.json
         path: ${{ github.workspace }}/sbom.json
     - name: Upload vdr
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: vulRep-${{ github.run_id }}-${{ github.run_number }}.vdr.json
         path: ${{ github.workspace }}/sbom.vdr.json
     - name: Upload html
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: vulRep-${{ github.run_id }}-${{ github.run_number }}.html
         path: ${{ github.workspace }}/vulRep.html
-    - name: Install Dependency
-      run: sudo apt-get install wkhtmltopdf
-    - name: Generate pdf
-      run: |
-        echo "<html><body><pre>$(cat ${{ github.workspace }}/sbom.json)</pre></body></html>" > ${{ github.workspace }}/sbom.html
-        wkhtmltopdf ${{ github.workspace }}/sbom.html ${{ github.workspace }}/sbom.pdf
-        echo "<html><body><pre>$(cat ${{ github.workspace }}/sbom.vdr.json)</pre></body></html>" > ${{ github.workspace }}/sbomv.html
-        wkhtmltopdf ${{ github.workspace }}/sbomv.html ${{ github.workspace }}/sbomv.pdf
-        cat ${{ github.workspace }}/vulRep.html
-        wkhtmltopdf ${{ github.workspace }}/vulRep.html ${{ github.workspace }}/vulRep.pdf
-    - name: Mail Reports
+    - name: Debug File Paths
+      run: ls -lah ${{ github.workspace }}/
+    - name: Current Date and Time
+      id: date
+      run: echo "current_date=$(date +'%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_OUTPUT
+
+    - name: Mail Notification
       uses: dawidd6/action-send-mail@v3
       with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.GMAIL_USERNAME }}
-          password: ${{ secrets.GMAIL_PASSWORD }}
-          to: divijs75@gmail.com, divyanshbisht2005@gmail.com
-          from: akashsah2003@gmail.com
-          subject: "Latest security reports"
-          body: Please find the latest security reports
-          attachments: ${{ github.workspace }}/sbom.pdf,  ${{ github.workspace }}/sbomv.pdf, ${{ github.workspace }}/vulRep.pdf
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.GMAIL_USERNAME }}
+        password: ${{ secrets.GMAIL_PASSWORD }}
+        to: divyanshbisht2005@gmail.com
+        from: divyanshbisht2005@gmail.com
+        subject: "Security Report Generated: ${{ github.repository }} - Run #${{ github.run_number }}"
+        html_body: |
+          <html>
+          <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+            <p>Hello,</p>
+            <p>A new security report has been generated for the repository: <strong><code>${{ github.repository }}</code></strong>.</p>
+            <h3>Details:</h3>
+            <ul>
+              <li><strong>Workflow Run ID:</strong> <code>${{ github.run_id }}</code></li>
+              <li><strong>Workflow Run Number:</strong> <code>${{ github.run_number }}</code></li>
+              <li><strong>Commit SHA:</strong> <code>${{ github.sha }}</code></li>
+              <li><strong>Branch:</strong> <code>${{ github.ref_name }}</code></li>
+              <li><strong>Generated At:</strong><code>${{ steps.date.outputs.current_date }}</code></li>
+            </ul>
+            <p>The following artifacts have been uploaded to this workflow run and can
+            be downloaded from the "Summary" tab of the workflow run on GitHub:</p>
+            <ul>
+              <li><strong>SBOM (Software Bill of Materials):</strong> <code>sbom-${{ github.run_id }}-${{ github.run_number }}.json</code></li>
+              <li><strong>Vulnerability Disclosure Report (if generated):</strong> <code>vulRep-${{ github.run_id }}-${{ github.run_number }}.vdr.json</code></li>
+              <li><strong>HTML Vulnerability Report:</strong> <code>vulRep-${{ github.run_id }}-${{ github.run_number }}.html</code></li>
+            </ul>
+            <p>Please log in to SBOMGen or <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">GitHub</a> to review the generated reports.</p>
+            <p>Best regards,<br>
+            Team SBOMGen</p>
+          </body>
+          </html>
